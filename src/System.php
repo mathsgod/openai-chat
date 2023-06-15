@@ -5,18 +5,27 @@ namespace OpenAI\Chat;
 use OpenAI\Client;
 use Gioni06\Gpt3Tokenizer\Gpt3TokenizerConfig;
 use Gioni06\Gpt3Tokenizer\Gpt3Tokenizer;
+use Psr\Log\LoggerAwareInterface;
+use Psr\Log\LoggerAwareTrait;
+use Psr\Log\NullLogger;
 
-class System
+class System implements LoggerAwareInterface
 {
+
+    use LoggerAwareTrait;
+
     private $model;
     public $messages = [];
     private $client;
     public $functions = [];
+    private $temperature;
 
-    public function __construct(string $openai_api_key, string $model = "gpt-3.5-turbo-0613")
+    public function __construct(string $openai_api_key, string $model = "gpt-3.5-turbo-0613", ?float $temperature = null)
     {
         $this->model = $model;
         $this->client = new Client($openai_api_key);
+        $this->logger = new NullLogger();
+        $this->temperature = $temperature;
     }
 
     public function addUserMessage(string $content)
@@ -108,6 +117,10 @@ class System
                 return $m;
             }, $final),
         ];
+
+        if (isset($this->temperature)) {
+            $body["temperature"] = $this->temperature;
+        }
 
         if ($this->functions) {
             $body["functions"] = array_values(array_map(function ($f) {

@@ -9,11 +9,15 @@
     ],
     "require": {
         "mathsgod/openai-client": "^1.0",
-        "gioni06/gpt3-tokenizer": "^1.2"
+        "gioni06/gpt3-tokenizer": "^1.2",
+        "psr/log": "^3.0"
     },
     "autoload": {
         "psr-4": {
             "OpenAI\\Chat\\": "src/"
         }
+    },
+    "require-dev": {
+        "monolog/monolog": "^2.9"
     }
 }
