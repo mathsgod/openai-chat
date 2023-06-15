@@ -1,0 +1,19 @@
+{
+    "name": "mathsgod/openai-chat",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Raymond Chong",
+            "email": "mathsgod@yahoo.com"
+        }
+    ],
+    "require": {
+        "mathsgod/openai-client": "^1.0",
+        "gioni06/gpt3-tokenizer": "^1.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "OpenAI\\Chat\\": "src/"
+        }
+    }
+}
