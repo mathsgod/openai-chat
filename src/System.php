@@ -160,12 +160,15 @@ class System implements LoggerAwareInterface
 
     public function run()
     {
+
         do {
             $body = $this->getBody();
+
+            $this->logger->info("Messages", $body["messages"]);
+
             $response = $this->client->createChatCompletion($body);
 
             $usage = $response["usage"];
-
 
             $message = $response["choices"][0]["message"];
             $message["tokens"] = $usage["completion_tokens"] + 3;
@@ -174,10 +177,16 @@ class System implements LoggerAwareInterface
 
             if ($function_call = $response["choices"][0]["message"]["function_call"] ?? false) {
 
+
                 $function = $this->functions[$function_call["name"]];
                 $arguments = json_decode($function_call["arguments"], true);
-                $function_response = json_encode(call_user_func_array($function["handler"], $arguments), JSON_UNESCAPED_UNICODE);
-                $this->addFunctionMessage($function_response, $function_call["name"]);
+
+                $this->logger->info("Function call [" . $function_call["name"] . "]", $arguments);
+
+                $function_response = call_user_func_array($function["handler"], $arguments);
+                $this->logger->info("Function response", [$function_response]);
+
+                $this->addFunctionMessage(json_encode($function_response, JSON_UNESCAPED_UNICODE), $function_call["name"]);
 
                 continue;
             } else {
