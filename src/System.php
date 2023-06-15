@@ -86,7 +86,6 @@ class System
 
         $token_left = $max_token - $token_count;
 
-
         $final = [];
         $messages = array_reverse($this->messages);
         foreach ($messages as $m) {
