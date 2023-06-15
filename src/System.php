@@ -172,11 +172,6 @@ class System
             }
         } while (true);
 
-        print_R($response);
         return $response["choices"][0]["message"]["content"];
-    }
-
-    public function getTokenCount()
-    {
     }
 }
