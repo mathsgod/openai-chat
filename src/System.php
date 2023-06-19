@@ -17,7 +17,9 @@ class System implements LoggerAwareInterface
     private $model;
     public $messages = [];
     private $client;
+    /** @var FunctionInterface[] */
     public $functions = [];
+
     private $temperature;
 
     public function __construct(string $openai_api_key, string $model = "gpt-3.5-turbo-0613", ?float $temperature = null)
@@ -70,12 +72,17 @@ class System implements LoggerAwareInterface
 
     public function addFunction(string $name, string $description, array $parameters, callable $handler)
     {
-        $this->functions[$name] = [
-            "name" => $name,
-            "description" => $description,
-            "parameters" => $parameters,
-            "handler" => $handler,
-        ];
+        $this->functions[$name] = new ChatFunction($name, $description, $parameters, $handler);
+    }
+
+    /**
+     * @param FunctionInterface[] $functions
+     */
+    public function addFunctions(array $functions)
+    {
+        foreach ($functions as $f) {
+            $this->functions[$f->getName()] = $f;
+        }
     }
 
     private function getBody()
@@ -125,9 +132,9 @@ class System implements LoggerAwareInterface
         if ($this->functions) {
             $body["functions"] = array_values(array_map(function ($f) {
                 return [
-                    "name" => $f["name"],
-                    "description" => $f["description"],
-                    "parameters" => $f["parameters"]
+                    "name" => $f->getName(),
+                    "description" => $f->getDescription(),
+                    "parameters" => $f->getParameters()
                 ];
             }, $this->functions));
         }
@@ -141,9 +148,9 @@ class System implements LoggerAwareInterface
 
         $ft = 0;
         foreach ($this->functions as $f) {
-            $ft += count($t->encode($f["name"]))
-                + count($t->encode($f["description"]))
-                + count($t->encode(json_encode($f["parameters"], JSON_UNESCAPED_UNICODE)));
+            $ft += count($t->encode($f->getName()))
+                + count($t->encode($f->getDescription()))
+                + count($t->encode(json_encode($f->getParameters(), JSON_UNESCAPED_UNICODE)));
             $ft += 4;
         }
         return $ft;
@@ -167,11 +174,11 @@ class System implements LoggerAwareInterface
             $this->logger->info("Messages", $body["messages"]);
 
             $response = $this->client->createChatCompletion($body);
-
             $usage = $response["usage"];
 
             $message = $response["choices"][0]["message"];
             $message["tokens"] = $usage["completion_tokens"] + 3;
+
 
             $this->messages[] = $message;
 
@@ -183,7 +190,7 @@ class System implements LoggerAwareInterface
 
                 $this->logger->info("Function call [" . $function_call["name"] . "]", $arguments);
 
-                $function_response = call_user_func_array($function["handler"], $arguments);
+                $function_response = call_user_func_array($function->getHandler(), $arguments);
                 $this->logger->info("Function response", [$function_response]);
 
                 $this->addFunctionMessage(json_encode($function_response, JSON_UNESCAPED_UNICODE), $function_call["name"]);
