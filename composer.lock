@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "9976917beee81f70f41f1f69bada3a1b",
+    "content-hash": "5e0d44d7ca68b16d8b1d5afda82cd39f",
     "packages": [
         {
             "name": "gioni06/gpt3-tokenizer",
@@ -386,21 +386,25 @@
         },
         {
             "name": "mathsgod/openai-client",
-            "version": "1.0.0",
+            "version": "1.1.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/mathsgod/openai-client.git",
-                "reference": "5d3564af0c38f091bc55ca6063abe371585c100c"
+                "reference": "816cd6eac1c3f967796c0a7d6ce83d5073170f49"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/mathsgod/openai-client/zipball/5d3564af0c38f091bc55ca6063abe371585c100c",
-                "reference": "5d3564af0c38f091bc55ca6063abe371585c100c",
+                "url": "https://api.github.com/repos/mathsgod/openai-client/zipball/816cd6eac1c3f967796c0a7d6ce83d5073170f49",
+                "reference": "816cd6eac1c3f967796c0a7d6ce83d5073170f49",
                 "shasum": ""
             },
             "require": {
                 "gioni06/gpt3-tokenizer": "^1.2",
-                "guzzlehttp/guzzle": "^7.5"
+                "guzzlehttp/guzzle": "^7.5",
+                "psr/log": "^3.0"
+            },
+            "require-dev": {
+                "monolog/monolog": "^2.9"
             },
             "type": "library",
             "autoload": {
@@ -421,9 +425,9 @@
             "description": "A PHP client for OpenAI's API",
             "support": {
                 "issues": "https://github.com/mathsgod/openai-client/issues",
-                "source": "https://github.com/mathsgod/openai-client/tree/1.0.0"
+                "source": "https://github.com/mathsgod/openai-client/tree/1.1.1"
             },
-            "time": "2023-06-13T03:26:10+00:00"
+            "time": "2023-06-19T05:17:33+00:00"
         },
         {
             "name": "psr/http-client",

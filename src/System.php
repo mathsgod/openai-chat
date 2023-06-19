@@ -7,6 +7,7 @@ use Gioni06\Gpt3Tokenizer\Gpt3TokenizerConfig;
 use Gioni06\Gpt3Tokenizer\Gpt3Tokenizer;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
+use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 
 class System implements LoggerAwareInterface
@@ -28,6 +29,13 @@ class System implements LoggerAwareInterface
         $this->client = new Client($openai_api_key);
         $this->logger = new NullLogger();
         $this->temperature = $temperature;
+    }
+
+
+    public function setLogger(LoggerInterface $logger): void
+    {
+        $this->logger = $logger;
+        $this->client->setLogger($logger);
     }
 
     public function addUserMessage(string $content)
