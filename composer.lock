@@ -386,16 +386,16 @@
         },
         {
             "name": "mathsgod/openai-client",
-            "version": "1.1.1",
+            "version": "1.1.4",
             "source": {
                 "type": "git",
                 "url": "https://github.com/mathsgod/openai-client.git",
-                "reference": "816cd6eac1c3f967796c0a7d6ce83d5073170f49"
+                "reference": "04395893a2703aab02944da471332a59ec491904"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/mathsgod/openai-client/zipball/816cd6eac1c3f967796c0a7d6ce83d5073170f49",
-                "reference": "816cd6eac1c3f967796c0a7d6ce83d5073170f49",
+                "url": "https://api.github.com/repos/mathsgod/openai-client/zipball/04395893a2703aab02944da471332a59ec491904",
+                "reference": "04395893a2703aab02944da471332a59ec491904",
                 "shasum": ""
             },
             "require": {
@@ -425,9 +425,9 @@
             "description": "A PHP client for OpenAI's API",
             "support": {
                 "issues": "https://github.com/mathsgod/openai-client/issues",
-                "source": "https://github.com/mathsgod/openai-client/tree/1.1.1"
+                "source": "https://github.com/mathsgod/openai-client/tree/1.1.4"
             },
-            "time": "2023-06-19T05:17:33+00:00"
+            "time": "2023-06-21T02:54:58+00:00"
         },
         {
             "name": "psr/http-client",

@@ -23,8 +23,13 @@ class System implements LoggerAwareInterface
 
     private $temperature;
 
-    public function __construct(string $openai_api_key, string $model = "gpt-3.5-turbo-0613", ?float $temperature = null)
-    {
+    protected $usages = [];
+
+    public function __construct(
+        string $openai_api_key,
+        string $model = "gpt-3.5-turbo-0613",
+        ?float $temperature = null
+    ) {
         $this->model = $model;
         $this->client = new Client($openai_api_key);
         $this->logger = new NullLogger();
@@ -173,6 +178,11 @@ class System implements LoggerAwareInterface
         return $mt;
     }
 
+    public function getUsages()
+    {
+        return $this->usages;
+    }
+
     public function run()
     {
 
@@ -184,14 +194,15 @@ class System implements LoggerAwareInterface
             $response = $this->client->createChatCompletion($body);
             $usage = $response["usage"];
 
+            $this->usages[] = $usage;
+
+
             $message = $response["choices"][0]["message"];
             $message["tokens"] = $usage["completion_tokens"] + 3;
-
 
             $this->messages[] = $message;
 
             if ($function_call = $response["choices"][0]["message"]["function_call"] ?? false) {
-
 
                 $function = $this->functions[$function_call["name"]];
                 $arguments = json_decode($function_call["arguments"], true);
