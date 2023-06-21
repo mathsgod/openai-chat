@@ -203,10 +203,10 @@ class System implements LoggerAwareInterface
                     $this->logger->info("Function response", [$function_response]);
                 } catch (\Exception $e) {
                     $this->logger->error("Function error", [$e->getMessage()]);
-                    $function_response = ["error" => $e->getMessage()];
+                    return $e->getMessage()
                 } catch (\Error $e) {
                     $this->logger->error("Function error", [$e->getMessage()]);
-                    $function_response = ["error" => $e->getMessage()];
+                    return $e->getMessage();
                 }
 
                 $this->addFunctionMessage(json_encode($function_response, JSON_UNESCAPED_UNICODE), $function_call["name"]);
