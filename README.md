@@ -46,7 +46,7 @@ var_dump($system->run());
 
 
 ### Get usage records
-After run the code above, you will can get the usage records
+After run the code above, you can get the usage records
 ```php
 
 print_r($system->getUsages());
