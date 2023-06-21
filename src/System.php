@@ -198,8 +198,16 @@ class System implements LoggerAwareInterface
 
                 $this->logger->info("Function call [" . $function_call["name"] . "]", $arguments);
 
-                $function_response = call_user_func_array($function->getHandler(), $arguments);
-                $this->logger->info("Function response", [$function_response]);
+                try {
+                    $function_response = call_user_func_array($function->getHandler(), $arguments);
+                    $this->logger->info("Function response", [$function_response]);
+                } catch (\Exception $e) {
+                    $this->logger->error("Function error", [$e->getMessage()]);
+                    $function_response = ["error" => $e->getMessage()];
+                } catch (\Error $e) {
+                    $this->logger->error("Function error", [$e->getMessage()]);
+                    $function_response = ["error" => $e->getMessage()];
+                }
 
                 $this->addFunctionMessage(json_encode($function_response, JSON_UNESCAPED_UNICODE), $function_call["name"]);
 
