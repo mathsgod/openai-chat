@@ -42,3 +42,13 @@ $system->addFunction("getIPhoneReleaseDate", "Get the release date of iphone", [
 
 var_dump($system->run());
 ```
+
+
+
+### Get usage records
+After run the code above, you will can get the usage records
+```php
+
+print_r($system->getUsages());
+
+```
