@@ -22,8 +22,9 @@ $system->addFunction("getIPhonePrice", "Get the price of iphone", [
         "model" => [
             "type" => "string",
             "description" => "Model of the iPhone"
-        ]
-    ]
+        ],
+    ],
+    "required" => ["model"]
 ], function (string $model) {
     return ["price" => "$799", "model" => $model];
 });
@@ -35,7 +36,7 @@ $system->addFunction("getIPhoneReleaseDate", "Get the release date of iphone", [
             "type" => "string",
             "description" => "Model of the iPhone"
         ]
-    ]
+    ],"required" => ["model"]
 ], function (string $model) {
     return ["date" => "2022-09-14", "model" => $model];
 });
