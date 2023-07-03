@@ -25,6 +25,8 @@ class System implements LoggerAwareInterface
 
     protected $usages = [];
 
+    private $function_call = null;
+
     public function __construct(
         string $openai_api_key,
         string $model = "gpt-3.5-turbo-0613",
@@ -98,6 +100,11 @@ class System implements LoggerAwareInterface
         }
     }
 
+    public function setFunctionCall($function_call)
+    {
+        $this->function_call = $function_call;
+    }
+
     private function getBody()
     {
 
@@ -151,6 +158,11 @@ class System implements LoggerAwareInterface
                 ];
             }, $this->functions));
         }
+
+        if ($this->function_call) {
+            $body["function_call"] = $this->function_call;
+        }
+
 
         return $body;
     }
