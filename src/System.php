@@ -195,6 +195,11 @@ class System implements LoggerAwareInterface
         return $this->usages;
     }
 
+    public function getMessages()
+    {
+        return $this->messages;
+    }
+
     public function run()
     {
 
