@@ -27,15 +27,21 @@ class System implements LoggerAwareInterface
 
     private $function_call = null;
 
+    private $token = 4096;
+
     public function __construct(
         string $openai_api_key,
-        string $model = "gpt-3.5-turbo-0613",
+        string $model = "gpt-3.5-turbo-1106",
         ?float $temperature = null
     ) {
         $this->model = $model;
         $this->client = new Client($openai_api_key);
         $this->logger = new NullLogger();
         $this->temperature = $temperature;
+
+        if ($model == "gpt-3.5-turbo-0613") {
+            $this->token = 4096;
+        }
     }
 
 
@@ -74,13 +80,14 @@ class System implements LoggerAwareInterface
         ];
     }
 
-    public function addFunctionMessage(string $content, string $name)
+    public function addFunctionMessage(string $content, string $name, string $tool_call_id)
     {
         $t = new Gpt3Tokenizer(new Gpt3TokenizerConfig());
         $this->messages[] = [
-            "role" => "function",
-            "content" => $content,
+            "tool_call_id" => $tool_call_id,
+            "role" => "tool",
             "name" => $name,
+            "content" => $content,
             "tokens" => count($t->encode($content)) + count($t->encode($name)) + 4
         ];
     }
@@ -108,7 +115,7 @@ class System implements LoggerAwareInterface
     private function getBody()
     {
 
-        $max_token = 4096;
+        $max_token = $this->token;
 
         // function token
         $token_count = $this->getFunctionsToken();
@@ -150,11 +157,14 @@ class System implements LoggerAwareInterface
         }
 
         if ($this->functions) {
-            $body["functions"] = array_values(array_map(function ($f) {
+            $body["tools"] = array_values(array_map(function ($f) {
                 return [
-                    "name" => $f->getName(),
-                    "description" => $f->getDescription(),
-                    "parameters" => $f->getParameters()
+                    "type" => "function",
+                    "function" => [
+                        "name" => $f->getName(),
+                        "description" => $f->getDescription(),
+                        "parameters" => $f->getParameters()
+                    ]
                 ];
             }, $this->functions));
         }
@@ -219,25 +229,30 @@ class System implements LoggerAwareInterface
 
             $this->messages[] = $message;
 
-            if ($function_call = $response["choices"][0]["message"]["function_call"] ?? false) {
+            $tool_calls = $message["tool_calls"];
+            if ($tool_calls) {
+                foreach ($tool_calls as $tool_call) {
+                    $tool_call_id = $tool_call["id"];
+                    $arguments = $tool_call["function"]["arguments"];
 
-                $function = $this->functions[$function_call["name"]];
-                $arguments = json_decode($function_call["arguments"], true);
+                    $function = $this->functions[$tool_call["function"]["name"]];
+                    $arguments = json_decode($tool_call["function"]["arguments"], true);
 
-                $this->logger->info("Function call [" . $function_call["name"] . "]", $arguments);
+                    $this->logger->info("Function call [" . $function->getName() . "]", $arguments);
 
-                try {
-                    $function_response = call_user_func_array($function->getHandler(), $arguments);
-                    $this->logger->info("Function response", [$function_response]);
-                } catch (\Exception $e) {
-                    $this->logger->error("Function error", [$e->getMessage()]);
-                    return $e->getMessage();
-                } catch (\Error $e) {
-                    $this->logger->error("Function error", [$e->getMessage()]);
-                    return $e->getMessage();
+                    try {
+                        $function_response = call_user_func_array($function->getHandler(), $arguments);
+                        $this->logger->info("Function response", [$function_response]);
+                    } catch (\Exception $e) {
+                        $this->logger->error("Function error", [$e->getMessage()]);
+                        return $e->getMessage();
+                    } catch (\Error $e) {
+                        $this->logger->error("Function error", [$e->getMessage()]);
+                        return $e->getMessage();
+                    }
+
+                    $this->addFunctionMessage(json_encode($function_response, JSON_UNESCAPED_UNICODE), $function->getName(), $tool_call_id);
                 }
-
-                $this->addFunctionMessage(json_encode($function_response, JSON_UNESCAPED_UNICODE), $function_call["name"]);
 
                 continue;
             } else {
