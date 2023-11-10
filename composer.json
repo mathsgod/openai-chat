@@ -1,5 +1,6 @@
 {
     "name": "mathsgod/openai-chat",
+    "description": "OpenAI Chat completion wrapper. Support function calls and variable assignment.",
     "license": "MIT",
     "authors": [
         {
