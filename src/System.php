@@ -27,7 +27,7 @@ class System implements LoggerAwareInterface
 
     private $function_call = null;
 
-    private $token = 4096;
+    private $token = 16384;
 
     public function __construct(
         string $openai_api_key,
