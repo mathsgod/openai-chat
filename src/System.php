@@ -229,8 +229,8 @@ class System implements LoggerAwareInterface
 
             $this->messages[] = $message;
 
-            $tool_calls = $message["tool_calls"];
-            if ($tool_calls) {
+            if (isset($message["tool_calls"])) {
+                $tool_calls = $message["tool_calls"];
                 foreach ($tool_calls as $tool_call) {
                     $tool_call_id = $tool_call["id"];
                     $arguments = $tool_call["function"]["arguments"];
