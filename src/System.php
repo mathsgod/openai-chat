@@ -32,10 +32,11 @@ class System implements LoggerAwareInterface
     public function __construct(
         string $openai_api_key,
         string $model = "gpt-3.5-turbo-1106",
-        ?float $temperature = null
+        ?float $temperature = null,
+        string $baseURL = "https://api.openai.com/v1/"
     ) {
         $this->model = $model;
-        $this->client = new Client($openai_api_key);
+        $this->client = new Client($openai_api_key, 10, $baseURL);
         $this->logger = new NullLogger();
         $this->temperature = $temperature;
 

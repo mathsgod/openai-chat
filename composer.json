@@ -9,9 +9,9 @@
         }
     ],
     "require": {
-        "mathsgod/openai-client": "^1.1",
         "gioni06/gpt3-tokenizer": "^1.2",
-        "psr/log": "^3.0"
+        "psr/log": "^3.0",
+        "mathsgod/openai-client": "^1.2"
     },
     "autoload": {
         "psr-4": {
