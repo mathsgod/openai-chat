@@ -5,6 +5,7 @@ namespace OpenAI\Chat;
 use OpenAI\Client;
 use Gioni06\Gpt3Tokenizer\Gpt3TokenizerConfig;
 use Gioni06\Gpt3Tokenizer\Gpt3Tokenizer;
+use Psr\Http\Message\ResponseInterface;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
 use Psr\Log\LoggerInterface;
@@ -210,6 +211,20 @@ class System implements LoggerAwareInterface
     {
         return $this->messages;
     }
+
+
+    public function runAsStream()
+    {
+        $body = $this->getBody();
+        $body["stream"] = true;
+        $response = $this->client->createChatCompletion($body, true);
+
+        if ($response instanceof ResponseInterface) {
+            return $response->getBody();
+        }
+        return null;
+    }
+
 
     public function run()
     {
