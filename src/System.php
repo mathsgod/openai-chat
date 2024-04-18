@@ -5,11 +5,21 @@ namespace OpenAI\Chat;
 use OpenAI\Client;
 use Gioni06\Gpt3Tokenizer\Gpt3TokenizerConfig;
 use Gioni06\Gpt3Tokenizer\Gpt3Tokenizer;
+use GuzzleHttp\Pool;
+use GuzzleHttp\Promise\Promise;
+use GuzzleHttp\Psr7\AppendStream;
+use GuzzleHttp\Psr7\BufferStream;
+use GuzzleHttp\Psr7\Response;
+use GuzzleHttp\Psr7\Stream;
+use PDO;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use React\Stream\DuplexStreamInterface;
+use React\Stream\ReadableStreamInterface;
+use React\Stream\ThroughStream;
 
 class System implements LoggerAwareInterface
 {
@@ -30,9 +40,12 @@ class System implements LoggerAwareInterface
 
     private $token = 16384;
 
+    private $baseURL;
+    private $openai_api_key;
+
     public function __construct(
         string $openai_api_key,
-        string $model = "gpt-3.5-turbo-1106",
+        string $model = "gpt-3.5-turbo-0125",
         ?float $temperature = null,
         string $baseURL = "https://api.openai.com/v1/"
     ) {
@@ -41,10 +54,15 @@ class System implements LoggerAwareInterface
         $this->logger = new NullLogger();
         $this->temperature = $temperature;
 
+
         if ($model == "gpt-3.5-turbo-0613") {
             $this->token = 4096;
         }
+
+        $this->baseURL = $baseURL;
+        $this->openai_api_key = $openai_api_key;
     }
+
 
 
     public function setLogger(LoggerInterface $logger): void
@@ -58,7 +76,7 @@ class System implements LoggerAwareInterface
         $this->messages[] = [
             "role" => "user",
             "content" => $content,
-            "tokens" => count((new Gpt3Tokenizer(new Gpt3TokenizerConfig()))->encode($content)) + 4
+            // "tokens" => count((new Gpt3Tokenizer(new Gpt3TokenizerConfig()))->encode($content)) + 4
         ];
     }
 
@@ -68,7 +86,7 @@ class System implements LoggerAwareInterface
         $this->messages[] = [
             "role" => "system",
             "content" => $content,
-            "tokens" => count((new Gpt3Tokenizer(new Gpt3TokenizerConfig()))->encode($content)) + 4
+            //  "tokens" => count((new Gpt3Tokenizer(new Gpt3TokenizerConfig()))->encode($content)) + 4
         ];
     }
 
@@ -78,7 +96,7 @@ class System implements LoggerAwareInterface
         $this->messages[] = [
             "role" => "assistant",
             "content" => $content,
-            "tokens" => count((new Gpt3Tokenizer(new Gpt3TokenizerConfig()))->encode($content)) + 4
+            //  "tokens" => count((new Gpt3Tokenizer(new Gpt3TokenizerConfig()))->encode($content)) + 4
         ];
     }
 
@@ -90,7 +108,7 @@ class System implements LoggerAwareInterface
             "role" => "tool",
             "name" => $name,
             "content" => $content,
-            "tokens" => count($t->encode($content)) + count($t->encode($name)) + 4
+            // "tokens" => count($t->encode($content)) + count($t->encode($name)) + 4
         ];
     }
 
@@ -109,6 +127,9 @@ class System implements LoggerAwareInterface
         }
     }
 
+    /**
+     * @deprecated
+     */
     public function setFunctionCall($function_call)
     {
         $this->function_call = $function_call;
@@ -117,19 +138,19 @@ class System implements LoggerAwareInterface
     private function getBody()
     {
 
-        $max_token = $this->token;
+        //  $max_token = $this->token;
 
         // function token
-        $token_count = $this->getFunctionsToken();
+        //    $token_count = $this->getFunctionsToken();
 
         // system token
-        foreach ($this->messages as $m) {
+        /*         foreach ($this->messages as $m) {
             if ($m["role"] == "system") {
                 $token_count += $m["tokens"];
             }
-        }
+        } */
 
-        $token_left = $max_token - $token_count;
+        /*         $token_left = $max_token - $token_count;
 
         $final = [];
         $messages = array_reverse($this->messages);
@@ -144,14 +165,19 @@ class System implements LoggerAwareInterface
                 $final[] = $m;
             }
         }
-        $final = array_reverse($final);
+        $final = array_reverse($final); */
 
-        $body = [
+        /*      $body = [
             "model" => $this->model,
             "messages" => array_map(function ($m) {
                 unset($m["tokens"]);
                 return $m;
             }, $final),
+        ]; */
+
+        $body = [
+            "model" => $this->model,
+            "messages" => $this->messages,
         ];
 
         if (isset($this->temperature)) {
@@ -170,10 +196,12 @@ class System implements LoggerAwareInterface
                 ];
             }, $this->functions));
         }
-
+        /* 
         if ($this->function_call) {
             $body["function_call"] = $this->function_call;
         }
+ */
+
 
 
         return $body;
@@ -211,6 +239,108 @@ class System implements LoggerAwareInterface
     {
         return $this->messages;
     }
+
+    public function runAsync()
+    {
+        $body = $this->getBody();
+        $body["stream"] = true;
+
+        $browser = new \React\Http\Browser();
+
+        $promise = $browser->requestStreaming("POST", $this->baseURL . "chat/completions", [
+            "Authorization" => "Bearer " . $this->openai_api_key,
+            "Content-Type" => "application/json"
+        ], json_encode($body, JSON_UNESCAPED_UNICODE));
+
+        $stream = new ThroughStream();
+        $promise->then(function (ResponseInterface $response) use (&$stream) {
+
+            print_R($response->getHeaders());
+
+            $s = $response->getBody();
+            assert($s instanceof ReadableStreamInterface);
+
+            $tool_calls = [];
+
+            $s->on('data', function ($chunk) use (&$stream, &$tool_calls) {
+
+                $lines = explode("\n", $chunk);
+
+                foreach ($lines as $line) {
+                    if (substr($line, 0, 6) != "data: ") continue;
+                    //remove data:
+                    $line = substr($line, 6);
+
+                    if ($line == "[DONE]") {
+                        if (count($tool_calls)) {
+                            $this->messages[] = [
+                                "role" => "assistant",
+                                "tool_calls" => $tool_calls,
+                                "content" => null
+                            ];
+
+                            foreach ($tool_calls as $tool_call) {
+                                //execute function
+
+                                $this->messages[] = [
+                                    "role" => "tool",
+                                    "tool_call_id" => $tool_call["id"],
+                                    "content" => json_encode($this->executeFunction($tool_call["function"]), JSON_UNESCAPED_UNICODE),
+                                ];
+                            }
+
+                            $s = $this->runAsync();
+                            $s->on('data', function ($data) use ($stream) {
+                                $stream->write($data);
+                            });
+                        } else {
+                            $stream->write("data: [DONE]\n\n");
+                            $stream->close();
+                        }
+                        break;
+                    }
+
+                    $message = json_decode($line, true);
+                    $delta = $message["choices"][0]["delta"];
+
+                    if (isset($delta["content"])) {
+                        //$s->write("data: " . $delta["content"] . "\n\n");
+                        $stream->write("data: " . $line . "\n\n");
+                        continue;
+                    }
+
+                    if (isset($delta["tool_calls"])) {
+                        $tool_call = $delta["tool_calls"][0];
+
+                        if (isset($tool_call["id"])) {
+                            $tool_calls[] = $tool_call;
+                        } else {
+                            $index = intval($tool_call["index"]);
+                            $tool_calls[$index]["function"]["arguments"] .= $tool_call["function"]["arguments"];
+                        }
+                    }
+                }
+            });
+        });
+
+
+
+        return $stream;
+    }
+
+    private function executeFunction($function)
+    {
+        $name = $function["name"];
+        $arguments = json_decode($function["arguments"], true);
+
+        $func = $this->functions[$name];
+
+        if (!$func) {
+            return null;
+        }
+        return call_user_func_array($func->getHandler(), $arguments);
+    }
+
 
 
     public function runAsStream()
