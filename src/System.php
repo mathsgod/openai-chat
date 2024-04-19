@@ -453,35 +453,18 @@ class System implements LoggerAwareInterface
 
             $this->usages[] = $usage;
 
-
             $message = $response["choices"][0]["message"];
-            $message["tokens"] = $usage["completion_tokens"] + 3;
 
             $this->messages[] = $message;
 
             if (isset($message["tool_calls"])) {
                 $tool_calls = $message["tool_calls"];
                 foreach ($tool_calls as $tool_call) {
-                    $tool_call_id = $tool_call["id"];
-                    $arguments = $tool_call["function"]["arguments"];
-
-                    $function = $this->functions[$tool_call["function"]["name"]];
-                    $arguments = json_decode($tool_call["function"]["arguments"], true);
-
-                    $this->logger->info("Function call [" . $function->getName() . "]", $arguments);
-
-                    try {
-                        $function_response = call_user_func_array($function->getHandler(), $arguments);
-                        $this->logger->info("Function response", [$function_response]);
-                    } catch (\Exception $e) {
-                        $this->logger->error("Function error", [$e->getMessage()]);
-                        return $e->getMessage();
-                    } catch (\Error $e) {
-                        $this->logger->error("Function error", [$e->getMessage()]);
-                        return $e->getMessage();
-                    }
-
-                    $this->addFunctionMessage(json_encode($function_response, JSON_UNESCAPED_UNICODE), $function->getName(), $tool_call_id);
+                    $this->messages[] = [
+                        "role" => "tool",
+                        "content" =>  json_encode($this->executeFunction($tool_call["function"]), JSON_UNESCAPED_UNICODE),
+                        "tool_call_id" =>  $tool_call["id"],
+                    ];
                 }
 
                 continue;
