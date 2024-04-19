@@ -9,6 +9,7 @@
         }
     ],
     "require": {
+        "php": "^8.0",
         "gioni06/gpt3-tokenizer": "^1.2",
         "psr/log": "^3.0",
         "mathsgod/openai-client": "^1.3",
