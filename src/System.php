@@ -2,6 +2,7 @@
 
 namespace OpenAI\Chat;
 
+use Closure;
 use OpenAI\Client;
 use Gioni06\Gpt3Tokenizer\Gpt3TokenizerConfig;
 use Gioni06\Gpt3Tokenizer\Gpt3Tokenizer;
@@ -11,15 +12,22 @@ use GuzzleHttp\Psr7\AppendStream;
 use GuzzleHttp\Psr7\BufferStream;
 use GuzzleHttp\Psr7\Response;
 use GuzzleHttp\Psr7\Stream;
+use OpenAI\Chat\Attributes\Parameter;
+use OpenAI\Chat\Attributes\Tool;
 use PDO;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use React\Http\Message\ResponseException;
 use React\Stream\DuplexStreamInterface;
 use React\Stream\ReadableStreamInterface;
 use React\Stream\ThroughStream;
+use ReflectionFunction;
+use ReflectionFunctionAbstract;
+use ReflectionMethod;
+use ReflectionObject;
 
 class System implements LoggerAwareInterface
 {
@@ -43,6 +51,9 @@ class System implements LoggerAwareInterface
     private $baseURL;
     private $openai_api_key;
 
+    /** @var ReflectionFunction[] */
+    protected $tools = [];
+
     public function __construct(
         string $openai_api_key,
         string $model = "gpt-3.5-turbo-0125",
@@ -64,6 +75,76 @@ class System implements LoggerAwareInterface
     }
 
 
+    public function addTool(Closure $tool)
+    {
+        $func = new ReflectionFunction($tool);
+
+        if ($func->getAttributes(Tool::class) == null) {
+            return;
+        }
+
+        $tool_attr = $func->getAttributes(Tool::class);
+        $args = $tool_attr[0]->getArguments();
+
+
+        if (!array_key_exists("name", $args)) {
+            $this->tools[$func->getName()] = $func;
+        } else {
+            $this->tools[$args["name"]] = $func;
+        }
+    }
+
+
+    public function toolToBody(ReflectionFunction $method)
+    {
+        if ($tool_attr = $method->getAttributes(Tool::class)) {
+
+            $function = [];
+            $args = $tool_attr[0]->getArguments();
+
+            if (!array_key_exists("name", $args)) {
+                $function["name"] = $method->getName();
+            } else {
+                $function["name"] = $args["name"];
+            }
+
+            $function["description"] = $args["description"];
+
+            $function["parameters"] = [
+                "type" => "object",
+            ];
+
+            $properties = [];
+            $required = [];
+
+            foreach ($method->getParameters() as $param) {
+                $param_attr = $param->getAttributes(Parameter::class);
+                if ($param_attr) {
+                    $param_attr = $param_attr[0];
+
+                    $property = [];
+                    $property["description"] = ($param_attr->newInstance())->getDescription();
+                    $property["type"] = $param->getType()->getName();
+
+                    $properties[$param->getName()] = $property;
+
+                    if (!$param->isOptional()) {
+                        $required[] = $param->getName();
+                    }
+                }
+            }
+
+            $function["parameters"]["properties"] = $properties;
+
+            $function["parameters"]["required"] = $required;
+
+
+            return [
+                "type" => "function",
+                "function" => $function
+            ];
+        }
+    }
 
     public function setLogger(LoggerInterface $logger): void
     {
@@ -135,7 +216,7 @@ class System implements LoggerAwareInterface
         $this->function_call = $function_call;
     }
 
-    private function getBody()
+    public function getBody()
     {
 
         //  $max_token = $this->token;
@@ -184,6 +265,10 @@ class System implements LoggerAwareInterface
             $body["temperature"] = $this->temperature;
         }
 
+        foreach ($this->tools as $tool) {
+            $body["tools"][] = $this->toolToBody($tool);
+        }
+
         if ($this->functions) {
             $body["tools"] = array_values(array_map(function ($f) {
                 return [
@@ -196,6 +281,7 @@ class System implements LoggerAwareInterface
                 ];
             }, $this->functions));
         }
+
         /* 
         if ($this->function_call) {
             $body["function_call"] = $this->function_call;
@@ -245,6 +331,7 @@ class System implements LoggerAwareInterface
         $body = $this->getBody();
         $body["stream"] = true;
 
+
         $browser = new \React\Http\Browser();
 
         $promise = $browser->requestStreaming("POST", $this->baseURL . "chat/completions", [
@@ -254,8 +341,6 @@ class System implements LoggerAwareInterface
 
         $stream = new ThroughStream();
         $promise->then(function (ResponseInterface $response) use (&$stream) {
-
-            print_R($response->getHeaders());
 
             $s = $response->getBody();
             assert($s instanceof ReadableStreamInterface);
@@ -321,6 +406,8 @@ class System implements LoggerAwareInterface
                     }
                 }
             });
+        }, function (ResponseException $response) {
+            echo $response->getMessage();
         });
 
 
@@ -333,15 +420,12 @@ class System implements LoggerAwareInterface
         $name = $function["name"];
         $arguments = json_decode($function["arguments"], true);
 
-        $func = $this->functions[$name];
-
-        if (!$func) {
+        if (!array_key_exists($name, $this->tools)) {
             return null;
         }
-        return call_user_func_array($func->getHandler(), $arguments);
+        $func = $this->tools[$name];
+        return $func->invoke(...$arguments);
     }
-
-
 
     public function runAsStream()
     {
