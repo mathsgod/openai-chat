@@ -249,6 +249,13 @@ class System implements LoggerAwareInterface
         return $this->messages;
     }
 
+    public function askAsStream(string $content): DuplexStreamInterface
+    {
+        $this->addUserMessage($content);
+        return $this->runAsync();
+    }
+
+
     public function runAsync()
     {
         $body = $this->getBody();
@@ -270,7 +277,9 @@ class System implements LoggerAwareInterface
 
             $tool_calls = [];
 
-            $s->on('data', function ($chunk) use (&$stream, &$tool_calls) {
+            $contents = [];
+
+            $s->on('data', function ($chunk) use (&$stream, &$tool_calls, &$contents) {
 
                 $lines = explode("\n", $chunk);
 
@@ -301,8 +310,16 @@ class System implements LoggerAwareInterface
                             $s->on('data', function ($data) use ($stream) {
                                 $stream->write($data);
                             });
+                            $s->on("end", function () use ($stream) {
+                                $stream->end();
+                            });
+
+                            $s->on("close", function () use ($stream) {
+                                $stream->close();
+                            });
                         } else {
                             $stream->write("data: [DONE]\n\n");
+                            $stream->end();
                             $stream->close();
                         }
                         break;
@@ -313,6 +330,7 @@ class System implements LoggerAwareInterface
 
                     if (isset($delta["content"])) {
                         //$s->write("data: " . $delta["content"] . "\n\n");
+                        $contents[] = $delta["content"];
                         $stream->write("data: " . $line . "\n\n");
                         continue;
                     }
