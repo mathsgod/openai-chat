@@ -348,7 +348,7 @@ class System implements LoggerAwareInterface
                 }
             });
         }, function (ResponseException $response) {
-            echo $response->getMessage();
+            throw new \Exception($response->getMessage());
         });
         return $stream;
     }
