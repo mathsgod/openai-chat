@@ -181,40 +181,7 @@ class System implements LoggerAwareInterface
         ];
     }
 
-    public function addFunctionMessage(string $content, string $name, string $tool_call_id)
-    {
-        $t = new Gpt3Tokenizer(new Gpt3TokenizerConfig());
-        $this->messages[] = [
-            "tool_call_id" => $tool_call_id,
-            "role" => "tool",
-            "name" => $name,
-            "content" => $content,
-            // "tokens" => count($t->encode($content)) + count($t->encode($name)) + 4
-        ];
-    }
 
-    public function addFunction(string $name, string $description, array $parameters, callable $handler)
-    {
-        $this->functions[$name] = new ChatFunction($name, $description, $parameters, $handler);
-    }
-
-    /**
-     * @param FunctionInterface[] $functions
-     */
-    public function addFunctions(array $functions)
-    {
-        foreach ($functions as $f) {
-            $this->functions[$f->getName()] = $f;
-        }
-    }
-
-    /**
-     * @deprecated
-     */
-    public function setFunctionCall($function_call)
-    {
-        $this->function_call = $function_call;
-    }
 
     public function getBody()
     {
@@ -269,51 +236,7 @@ class System implements LoggerAwareInterface
             $body["tools"][] = $this->toolToBody($tool);
         }
 
-        if ($this->functions) {
-            $body["tools"] = array_values(array_map(function ($f) {
-                return [
-                    "type" => "function",
-                    "function" => [
-                        "name" => $f->getName(),
-                        "description" => $f->getDescription(),
-                        "parameters" => $f->getParameters()
-                    ]
-                ];
-            }, $this->functions));
-        }
-
-        /* 
-        if ($this->function_call) {
-            $body["function_call"] = $this->function_call;
-        }
- */
-
-
-
         return $body;
-    }
-
-    public function getFunctionsToken()
-    {
-        $t = new Gpt3Tokenizer(new Gpt3TokenizerConfig());
-
-        $ft = 0;
-        foreach ($this->functions as $f) {
-            $ft += count($t->encode($f->getName()))
-                + count($t->encode($f->getDescription()))
-                + count($t->encode(json_encode($f->getParameters(), JSON_UNESCAPED_UNICODE)));
-            $ft += 4;
-        }
-        return $ft;
-    }
-
-    public function getMessagesToken()
-    {
-        $mt = 0;
-        foreach ($this->messages as $m) {
-            $mt += $m["tokens"];
-        }
-        return $mt;
     }
 
     public function getUsages()
@@ -409,9 +332,6 @@ class System implements LoggerAwareInterface
         }, function (ResponseException $response) {
             echo $response->getMessage();
         });
-
-
-
         return $stream;
     }
 
@@ -427,36 +347,28 @@ class System implements LoggerAwareInterface
         return $func->invoke(...$arguments);
     }
 
-    public function runAsStream()
+    public function ask(string $content): string
     {
-        $body = $this->getBody();
-        $body["stream"] = true;
-        $response = $this->client->createChatCompletion($body, true);
-
-        if ($response instanceof ResponseInterface) {
-            return $response->getBody();
-        }
-        return null;
+        $this->addUserMessage($content);
+        $response = $this->run();
+        return $response["choices"][0]["message"]["content"];
     }
-
 
     public function run()
     {
-
         do {
             $body = $this->getBody();
 
             $this->logger->info("Messages", $body["messages"]);
 
             $response = $this->client->createChatCompletion($body);
-            $usage = $response["usage"];
 
+            $usage = $response["usage"];
             $this->usages[] = $usage;
 
             $message = $response["choices"][0]["message"];
 
             $this->messages[] = $message;
-
             if (isset($message["tool_calls"])) {
                 $tool_calls = $message["tool_calls"];
                 foreach ($tool_calls as $tool_call) {
@@ -466,13 +378,12 @@ class System implements LoggerAwareInterface
                         "tool_call_id" =>  $tool_call["id"],
                     ];
                 }
-
                 continue;
             } else {
                 break;
             }
         } while (true);
 
-        return $response["choices"][0]["message"]["content"];
+        return $response;
     }
 }
