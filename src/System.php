@@ -186,42 +186,6 @@ class System implements LoggerAwareInterface
     public function getBody()
     {
 
-        //  $max_token = $this->token;
-
-        // function token
-        //    $token_count = $this->getFunctionsToken();
-
-        // system token
-        /*         foreach ($this->messages as $m) {
-            if ($m["role"] == "system") {
-                $token_count += $m["tokens"];
-            }
-        } */
-
-        /*         $token_left = $max_token - $token_count;
-
-        $final = [];
-        $messages = array_reverse($this->messages);
-        foreach ($messages as $m) {
-            if ($m["role"] == "system") {
-                $final[] = $m;
-                continue;
-            }
-
-            if ($token_left >= $m["tokens"]) {
-                $token_left -= $m["tokens"];
-                $final[] = $m;
-            }
-        }
-        $final = array_reverse($final); */
-
-        /*      $body = [
-            "model" => $this->model,
-            "messages" => array_map(function ($m) {
-                unset($m["tokens"]);
-                return $m;
-            }, $final),
-        ]; */
 
         $body = [
             "model" => $this->model,
@@ -260,6 +224,9 @@ class System implements LoggerAwareInterface
     {
         $body = $this->getBody();
         $body["stream"] = true;
+        $body["stream_options"] = [
+            "include_usage" => true
+        ];
 
 
         $browser = new \React\Http\Browser();
@@ -326,7 +293,16 @@ class System implements LoggerAwareInterface
                     }
 
                     $message = json_decode($line, true);
+
+                    if ($message["usage"]) {
+                        $this->usages[] = $message["usage"];
+                        continue;
+                    }
+
+
+
                     $delta = $message["choices"][0]["delta"];
+
 
                     if (isset($delta["content"])) {
                         //$s->write("data: " . $delta["content"] . "\n\n");
@@ -403,5 +379,14 @@ class System implements LoggerAwareInterface
         } while (true);
 
         return $response;
+    }
+
+    public function getTotalTokens()
+    {
+        $tokens = 0;
+        foreach ($this->usages as $usage) {
+            $tokens += $usage["total_tokens"];
+        }
+        return $tokens;
     }
 }
