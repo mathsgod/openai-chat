@@ -6,15 +6,8 @@ use Closure;
 use OpenAI\Client;
 use Gioni06\Gpt3Tokenizer\Gpt3TokenizerConfig;
 use Gioni06\Gpt3Tokenizer\Gpt3Tokenizer;
-use GuzzleHttp\Pool;
-use GuzzleHttp\Promise\Promise;
-use GuzzleHttp\Psr7\AppendStream;
-use GuzzleHttp\Psr7\BufferStream;
-use GuzzleHttp\Psr7\Response;
-use GuzzleHttp\Psr7\Stream;
 use OpenAI\Chat\Attributes\Parameter;
 use OpenAI\Chat\Attributes\Tool;
-use PDO;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
@@ -25,9 +18,6 @@ use React\Stream\DuplexStreamInterface;
 use React\Stream\ReadableStreamInterface;
 use React\Stream\ThroughStream;
 use ReflectionFunction;
-use ReflectionFunctionAbstract;
-use ReflectionMethod;
-use ReflectionObject;
 use RuntimeException;
 
 class System implements LoggerAwareInterface
@@ -337,12 +327,9 @@ class System implements LoggerAwareInterface
                             $index = intval($tool_call["index"]);
                             $tool_calls[$index]["function"]["arguments"] .= $tool_call["function"]["arguments"];
                         }
-
-                        
                     }
                 }
             });
-
         }, function (ResponseException|RuntimeException $response) {
             throw new \Exception($response->getMessage());
         });
