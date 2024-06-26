@@ -28,6 +28,7 @@ use ReflectionFunction;
 use ReflectionFunctionAbstract;
 use ReflectionMethod;
 use ReflectionObject;
+use RuntimeException;
 
 class System implements LoggerAwareInterface
 {
@@ -61,7 +62,6 @@ class System implements LoggerAwareInterface
         string $baseURL = "https://api.openai.com/v1/"
     ) {
         $this->model = $model;
-        $this->client = new Client($openai_api_key, 10, $baseURL);
         $this->logger = new NullLogger();
         $this->temperature = $temperature;
 
@@ -149,7 +149,7 @@ class System implements LoggerAwareInterface
     public function setLogger(LoggerInterface $logger): void
     {
         $this->logger = $logger;
-        $this->client->setLogger($logger);
+        //$this->client->setLogger($logger);
     }
 
     public function addUserMessage(string $content)
@@ -236,7 +236,9 @@ class System implements LoggerAwareInterface
             "Content-Type" => "application/json"
         ], json_encode($body, JSON_UNESCAPED_UNICODE));
 
+
         $stream = new ThroughStream();
+
         $promise->then(function (ResponseInterface $response) use (&$stream) {
 
             $s = $response->getBody();
@@ -246,17 +248,35 @@ class System implements LoggerAwareInterface
 
             $contents = [];
 
-            $s->on('data', function ($chunk) use (&$stream, &$tool_calls, &$contents) {
+            $next_chunk = "";
 
-                $lines = explode("\n", $chunk);
+            $s->on('data', function ($chunk) use (&$stream, &$tool_calls, &$contents, &$next_chunk) {
+
+                $chunk = $next_chunk . $chunk;
+
+                $lines = explode("\n\n", $chunk);
+
+                //if last line is not empty, then it is not complete, only process the lines without last line
+                if ($lines[count($lines) - 1]) {
+                    $next_chunk = array_pop($lines);
+                } else {
+                    $next_chunk = "";
+                }
+
+                //filter out empty lines
+                $lines = array_filter($lines);
+
+                //process the lines
 
                 foreach ($lines as $line) {
+
                     if (substr($line, 0, 6) != "data: ") continue;
                     //remove data:
                     $line = substr($line, 6);
 
                     if ($line == "[DONE]") {
                         if (count($tool_calls)) {
+
                             $this->messages[] = [
                                 "role" => "assistant",
                                 "tool_calls" => $tool_calls,
@@ -273,15 +293,15 @@ class System implements LoggerAwareInterface
                                 ];
                             }
 
-                            $s = $this->runAsync();
-                            $s->on('data', function ($data) use ($stream) {
+                            $s1 = $this->runAsync();
+                            $s1->on('data', function ($data) use ($stream) {
                                 $stream->write($data);
                             });
-                            $s->on("end", function () use ($stream) {
+                            $s1->on("end", function () use ($stream) {
                                 $stream->end();
                             });
 
-                            $s->on("close", function () use ($stream) {
+                            $s1->on("close", function () use ($stream) {
                                 $stream->close();
                             });
                         } else {
@@ -294,15 +314,12 @@ class System implements LoggerAwareInterface
 
                     $message = json_decode($line, true);
 
-                    if ($message["usage"]) {
+                    if (isset($message["usage"])) {
                         $this->usages[] = $message["usage"];
                         continue;
                     }
 
-
-
                     $delta = $message["choices"][0]["delta"];
-
 
                     if (isset($delta["content"])) {
                         //$s->write("data: " . $delta["content"] . "\n\n");
@@ -320,10 +337,13 @@ class System implements LoggerAwareInterface
                             $index = intval($tool_call["index"]);
                             $tool_calls[$index]["function"]["arguments"] .= $tool_call["function"]["arguments"];
                         }
+
+                        
                     }
                 }
             });
-        }, function (ResponseException $response) {
+
+        }, function (ResponseException|RuntimeException $response) {
             throw new \Exception($response->getMessage());
         });
         return $stream;
@@ -355,7 +375,9 @@ class System implements LoggerAwareInterface
 
             $this->logger->info("Messages", $body["messages"]);
 
-            $response = $this->client->createChatCompletion($body);
+            $client = new Client($this->openai_api_key, 10, $this->baseURL);
+            $response = $client->createChatCompletion($body);
+
 
             $usage = $response["usage"];
             $this->usages[] = $usage;
